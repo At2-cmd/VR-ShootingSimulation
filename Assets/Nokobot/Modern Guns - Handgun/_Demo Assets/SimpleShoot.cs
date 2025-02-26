@@ -1,6 +1,9 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 [AddComponentMenu("Nokobot/Modern Guns/Simple Shoot")]
 public class SimpleShoot : MonoBehaviour
@@ -21,6 +24,11 @@ public class SimpleShoot : MonoBehaviour
     [Tooltip("Casing Ejection Speed")] [SerializeField] private float ejectPower = 150f;
 
     public AudioSource source;
+    public AudioClip magazineSound;
+    public AudioClip shootSound;
+    public AudioClip noAmmoSound;
+    private Magazine _currentMagazine;
+    [SerializeField] private XRSocketInteractor magzineSocketInteractor;
 
     void Start()
     {
@@ -29,6 +37,24 @@ public class SimpleShoot : MonoBehaviour
 
         if (gunAnimator == null)
             gunAnimator = GetComponentInChildren<Animator>();
+
+        magzineSocketInteractor.selectEntered.AddListener(OnMagazineInserted);
+        magzineSocketInteractor.selectExited.AddListener(OnMagazineRemoved);
+    }
+
+    private void OnMagazineInserted(SelectEnterEventArgs args)
+    {
+        if (args.interactableObject.transform.TryGetComponent(out Magazine magazine))
+        {
+            _currentMagazine = magazine;
+            source.PlayOneShot(magazineSound);
+        }
+    }
+
+    private void OnMagazineRemoved(SelectExitEventArgs args)
+    {
+        _currentMagazine = null;
+        source.PlayOneShot(magazineSound);
     }
 
     public void PullTheTrigger()
@@ -40,7 +66,13 @@ public class SimpleShoot : MonoBehaviour
     //This function creates the bullet behavior
     void Shoot()
     {
-        source.PlayOneShot(source.clip);
+        if (_currentMagazine == null || _currentMagazine?.CurrentAmmoCount <= 0)
+        {
+            source.PlayOneShot(noAmmoSound);
+            return;
+        }
+        _currentMagazine.UseAmmo();
+        source.PlayOneShot(shootSound);
         if (muzzleFlashPrefab)
         {
             //Create the muzzle flash
